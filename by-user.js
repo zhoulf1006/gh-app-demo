@@ -1,4 +1,6 @@
 require('dotenv').config();
+const { checkTokenPermissions } = require('./check-permissions');
+
 const express = require('express');
 const { Octokit } = require('@octokit/rest');
 const app = express();
@@ -12,7 +14,8 @@ let userAccessToken;
 
 // Redirect users to request GitHub access
 app.get('/login/github', (req, res) => {
-    const url = `https://github.com/login/oauth/authorize?client_id=${CLIENT_ID}`;
+    const scopes = 'repo, workflow, user';
+    const url = `https://github.com/login/oauth/authorize?client_id=${CLIENT_ID}&scope=${scopes}`;
     res.redirect(url);
 });
 
@@ -54,6 +57,20 @@ app.get('/api/auth/callback/github', async (req, res) => {
     }
 });
 
+// Route to check the permissions of the user's access token
+app.get('/check-permissions', async (req, res) => {
+    if (!userAccessToken) {
+        res.status(403).send('User not authenticated');
+        return;
+    }
+
+    try {
+        const scopes = await checkTokenPermissions(userAccessToken);
+        res.send(`The access token has the following scopes: ${scopes}`);
+    } catch (error) {
+        res.status(500).send('Error checking token permissions');
+    }
+});
 
 // Route to trigger a GitHub Actions workflow
 app.get('/trigger-workflow', async (req, res) => {
